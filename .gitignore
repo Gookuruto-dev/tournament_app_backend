@@ -3,6 +3,9 @@
 *.sqlite
 *.sqlite3
 
+# JSON files
+*.json
+
 # Binaries and executables
 *.exe
 *.exe~
@@ -10,6 +13,11 @@
 *.so
 *.dylib
 main
+bin/
+obj/
+*.out
+*.test
+*.prof
 
 # OS generated files
 .DS_Store
