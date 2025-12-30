@@ -1,0 +1,20 @@
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Binaries and executables
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+main
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# Environment files
+.env
+.env.local
