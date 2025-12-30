@@ -56,9 +56,9 @@ func UpdateMatchScore(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if req.WinnerID == m.Player1ID {
+	if m.Player1ID != nil && req.WinnerID == *m.Player1ID {
 		m.ScoreP1 += points
-	} else if req.WinnerID == m.Player2ID {
+	} else if m.Player2ID != nil && req.WinnerID == *m.Player2ID {
 		m.ScoreP2 += points
 	} else {
 		http.Error(w, "Invalid WinnerID", http.StatusBadRequest)
@@ -73,11 +73,9 @@ func UpdateMatchScore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if m.ScoreP1 >= winLimit {
-		pid := m.Player1ID
-		m.WinnerID = &pid
+		m.WinnerID = m.Player1ID
 	} else if m.ScoreP2 >= winLimit {
-		pid := m.Player2ID
-		m.WinnerID = &pid
+		m.WinnerID = m.Player2ID
 	}
 
 	if err := db.DB.Save(&m).Error; err != nil {
@@ -88,6 +86,18 @@ func UpdateMatchScore(w http.ResponseWriter, r *http.Request) {
 	// Update Stats if someone won
 	if m.WinnerID != nil {
 		updateWinnerStats(m.TournamentID, *m.WinnerID, req.WinType)
+		// Automatic progression to next match
+		if m.NextMatchID != nil {
+			var nm models.Match
+			if err := db.DB.First(&nm, *m.NextMatchID).Error; err == nil {
+				if m.NextMatchSlot == 1 {
+					nm.Player1ID = m.WinnerID
+				} else if m.NextMatchSlot == 2 {
+					nm.Player2ID = m.WinnerID
+				}
+				db.DB.Save(&nm)
+			}
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -151,9 +161,9 @@ func ManualMatchScore(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if match.ScoreP1 >= winLimit {
-		match.WinnerID = &match.Player1ID
+		match.WinnerID = match.Player1ID
 	} else if match.ScoreP2 >= winLimit {
-		match.WinnerID = &match.Player2ID
+		match.WinnerID = match.Player2ID
 	} else {
 		match.WinnerID = nil // Clear winner if score drops below limit
 	}
@@ -161,6 +171,19 @@ func ManualMatchScore(w http.ResponseWriter, r *http.Request) {
 	if err := db.DB.Save(&match).Error; err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Automatic progression to next match
+	if match.WinnerID != nil && match.NextMatchID != nil {
+		var nm models.Match
+		if err := db.DB.First(&nm, *match.NextMatchID).Error; err == nil {
+			if match.NextMatchSlot == 1 {
+				nm.Player1ID = match.WinnerID
+			} else if match.NextMatchSlot == 2 {
+				nm.Player2ID = match.WinnerID
+			}
+			db.DB.Save(&nm)
+		}
 	}
 
 	w.Header().Set("Content-Type", "application/json")

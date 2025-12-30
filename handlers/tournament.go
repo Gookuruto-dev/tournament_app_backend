@@ -295,16 +295,20 @@ func AdvanceTournamentPhase(w http.ResponseWriter, r *http.Request) {
 		if len(qualifiedIDs) < 2 {
 			t.Status = "Finished"
 		} else {
-			bracketMatches := generateBracketMatches(t.ID, qualifiedIDs, 1)
-			if err := db.DB.Create(&bracketMatches).Error; err != nil {
+			if err := db.DB.Transaction(func(tx *gorm.DB) error {
+				if err := generateBracketMatches(tx, t.ID, qualifiedIDs, 1); err != nil {
+					return err
+				}
+				t.Status = "BracketInProgress"
+				return tx.Save(&t).Error
+			}); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			t.Status = "BracketInProgress"
 		}
 
 	case "BracketInProgress":
-		// Find current max round
+		// Check if the final match is completed
 		maxRound := 0
 		for _, m := range t.Matches {
 			if m.Phase == "Bracket" && m.Round > maxRound {
@@ -312,35 +316,27 @@ func AdvanceTournamentPhase(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
-		// Get winners of the current round
-		var winners []uint
+		allFinalsFinished := true
 		for _, m := range t.Matches {
 			if m.Phase == "Bracket" && m.Round == maxRound {
-				if m.WinnerID != nil {
-					winners = append(winners, *m.WinnerID)
+				if m.WinnerID == nil {
+					allFinalsFinished = false
+					break
 				}
 			}
 		}
 
-		if len(winners) > 1 {
-			// Generate next round
-			nextRoundMatches := generateBracketMatches(t.ID, winners, maxRound+1)
-			if err := db.DB.Create(&nextRoundMatches).Error; err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		} else {
-			// Tournament Finished
+		if allFinalsFinished {
 			t.Status = "Finished"
+			db.DB.Save(&t)
+		} else {
+			http.Error(w, "Final match is not finished yet", http.StatusBadRequest)
+			return
 		}
 
 	default:
 		t.Status = "Finished"
-	}
-
-	if err := db.DB.Save(&t).Error; err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+		db.DB.Save(&t)
 	}
 
 	// Refetch with all preloads for the response

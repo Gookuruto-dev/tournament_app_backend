@@ -65,11 +65,11 @@ type Tournament struct {
 // Match represents a battle between two players.
 type Match struct {
 	gorm.Model
-	TournamentID uint        `json:"tournament_id"`
-	Player1ID    uint        `json:"player1_id"`
-	Player2ID    uint        `json:"player2_id"`
-	Player1      Participant `gorm:"foreignKey:Player1ID" json:"player1"`
-	Player2      Participant `gorm:"foreignKey:Player2ID" json:"player2"`
+	TournamentID uint         `json:"tournament_id"`
+	Player1ID    *uint        `json:"player1_id"`
+	Player2ID    *uint        `json:"player2_id"`
+	Player1      *Participant `gorm:"foreignKey:Player1ID" json:"player1"`
+	Player2      *Participant `gorm:"foreignKey:Player2ID" json:"player2"`
 
 	ScoreP1  int   `json:"score_p1"`
 	ScoreP2  int   `json:"score_p2"`
@@ -77,6 +77,9 @@ type Match struct {
 
 	Phase string `json:"phase"` // Group, Bracket
 	Round int    `json:"round"` // Round number
+
+	NextMatchID   *uint `json:"next_match_id"`   // Future round match
+	NextMatchSlot int   `json:"next_match_slot"` // 1 for Player1, 2 for Player2
 
 	// Could store individual round results (spin/burst/extreme) as a JSON blob or separate table if detailed history is needed.
 	// For "start simple", maybe just scores? But tracking logic (Burst=2) might need logs.

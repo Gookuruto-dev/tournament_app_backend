@@ -2,6 +2,8 @@ package handlers
 
 import (
 	"bbx_tournament/models"
+
+	"gorm.io/gorm"
 )
 
 // generateMatchesFromGroups creates matches based on assigned groups using a Circle Method for rounds
@@ -37,15 +39,17 @@ func generateMatchesFromGroups(tournamentID uint, participants []models.Tourname
 
 		for round := 1; round <= numRounds; round++ {
 			for i := 0; i < half; i++ {
-				p1 := players[i]
-				p2 := players[n-1-i]
+				p1ID := players[i]
+				p2ID := players[n-1-i]
 
 				// Skip matches with dummy player (id 0)
-				if p1 != 0 && p2 != 0 {
+				if p1ID != 0 && p2ID != 0 {
+					p1 := p1ID
+					p2 := p2ID
 					matches = append(matches, models.Match{
 						TournamentID: tournamentID,
-						Player1ID:    p1,
-						Player2ID:    p2,
+						Player1ID:    &p1,
+						Player2ID:    &p2,
 						Phase:        groupName,
 						Round:        round,
 						ScoreP1:      0,
@@ -61,34 +65,65 @@ func generateMatchesFromGroups(tournamentID uint, participants []models.Tourname
 	return matches
 }
 
-// generateBracketMatches creates a round of a single-elimination bracket
-func generateBracketMatches(tournamentID uint, playerIDs []uint, round int) []models.Match {
-	var matches []models.Match
+// generateBracketMatches creates the entire single-elimination bracket tree and saves it to the DB
+func generateBracketMatches(tx *gorm.DB, tournamentID uint, playerIDs []uint, startRound int) error {
 	n := len(playerIDs)
 	if n < 2 {
-		return matches
+		return nil
 	}
 
-	// Simple pairing: 0 vs 1, 2 vs 3, etc.
-	for i := 0; i < n; i += 2 {
-		if i+1 >= n {
-			// Odd number of players? Should ideally be handled by Byes earlier,
-			// but for now let's just break or handle if needed.
-			// Bracket should usually be power of 2 from selection logic.
-			break
+	// 1. Calculate the number of rounds
+	// We assume n players qualify. Rounds = ceil(log2(n))
+	numRounds := 0
+	for (1 << numRounds) < n {
+		numRounds++
+	}
+
+	// 2. Generate matches round by round in REVERSE (Final first)
+	// Track matches of the "next" round to link them as parents
+	var nextRoundMatches []models.Match
+
+	for r := numRounds; r >= 1; r-- {
+		numMatchesInRound := 1 << (numRounds - r)
+		var currentRoundMatches []models.Match
+
+		for i := 0; i < numMatchesInRound; i++ {
+			m := models.Match{
+				TournamentID: tournamentID,
+				Phase:        "Bracket",
+				Round:        r + startRound - 1,
+			}
+
+			// Link to parent match (from logically subsequent round)
+			if len(nextRoundMatches) > 0 {
+				parentMatch := nextRoundMatches[i/2]
+				m.NextMatchID = &parentMatch.ID
+				m.NextMatchSlot = (i % 2) + 1
+			}
+
+			// If it's the first round (relative to bracket start), assign players
+			if r == 1 {
+				p1Idx := i * 2
+				p2Idx := i*2 + 1
+
+				if p1Idx < n {
+					p1 := playerIDs[p1Idx]
+					m.Player1ID = &p1
+				}
+				if p2Idx < n {
+					p2 := playerIDs[p2Idx]
+					m.Player2ID = &p2
+				}
+			}
+
+			// Save to get ID
+			if err := tx.Create(&m).Error; err != nil {
+				return err
+			}
+			currentRoundMatches = append(currentRoundMatches, m)
 		}
-		p1 := playerIDs[i]
-		p2 := playerIDs[i+1]
-		matches = append(matches, models.Match{
-			TournamentID: tournamentID,
-			Player1ID:    p1,
-			Player2ID:    p2,
-			Phase:        "Bracket",
-			Round:        round,
-			ScoreP1:      0,
-			ScoreP2:      0,
-		})
+		nextRoundMatches = currentRoundMatches
 	}
 
-	return matches
+	return nil
 }
