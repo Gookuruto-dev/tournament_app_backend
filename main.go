@@ -38,6 +38,7 @@ func main() {
 	r.Post("/tournaments/{id}/archive", handlers.ArchiveTournament)
 	r.Get("/tournaments/{id}", handlers.GetTournamentDetails)
 	r.Post("/tournaments/{id}/participants", handlers.AddParticipantToTournament)
+	r.Delete("/tournaments/{id}/participants/{participantId}", handlers.RemoveParticipantFromTournament)
 	r.Post("/tournaments/{id}/start", handlers.StartTournament) // Deprecated but kept
 	r.Post("/tournaments/{id}/groups", handlers.GenerateGroups)
 	r.Post("/tournaments/{id}/matches", handlers.GenerateMatches)

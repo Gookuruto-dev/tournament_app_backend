@@ -85,7 +85,7 @@ func UpdateMatchScore(w http.ResponseWriter, r *http.Request) {
 
 	// Update Stats if someone won
 	if m.WinnerID != nil {
-		updateWinnerStats(m.TournamentID, *m.WinnerID, req.WinType)
+		updateWinnerStats(m.TournamentID, *m.WinnerID, req.WinType, m.Phase)
 		// Automatic progression to next match
 		if m.NextMatchID != nil {
 			var nm models.Match
@@ -190,13 +190,16 @@ func ManualMatchScore(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(match)
 }
 
-func updateWinnerStats(tournamentID, participantID uint, winType string) {
+func updateWinnerStats(tournamentID, participantID uint, winType string, phase string) {
 	var tp models.TournamentParticipant
 	if err := db.DB.Where("tournament_id = ? AND participant_id = ?", tournamentID, participantID).First(&tp).Error; err != nil {
 		return
 	}
 
 	tp.Wins++
+	if phase == "Bracket" {
+		tp.AwardBracketWin()
+	}
 
 	switch winType {
 	case "Spin":

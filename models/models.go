@@ -48,6 +48,34 @@ type TournamentParticipant struct {
 	BurstFinishes  int `json:"burst_finishes"`
 	OverFinishes   int `json:"over_finishes"`
 	XtremeFinishes int `json:"xtreme_finishes"`
+	LeaguePoints   int `json:"league_points"` // Separate from bracket-advancement Points
+}
+
+// AwardParticipation awards 5 points for taking part.
+func (tp *TournamentParticipant) AwardParticipation() {
+	tp.LeaguePoints += 5
+}
+
+// AwardQualification awards 8 points for entering the bracket.
+func (tp *TournamentParticipant) AwardQualification() {
+	tp.LeaguePoints += 8
+}
+
+// AwardBracketWin awards 3 points for a bracket match win.
+func (tp *TournamentParticipant) AwardBracketWin() {
+	tp.LeaguePoints += 3
+}
+
+// AwardPodium awards points based on final standing.
+func (tp *TournamentParticipant) AwardPodium(rank int) {
+	switch rank {
+	case 1:
+		tp.LeaguePoints += 35
+	case 2:
+		tp.LeaguePoints += 19
+	case 3:
+		tp.LeaguePoints += 12
+	}
 }
 
 // Tournament represents a single event.

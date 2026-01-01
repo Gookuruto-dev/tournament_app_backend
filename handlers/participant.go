@@ -62,12 +62,12 @@ func ArchiveParticipant(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"status": "archived"}`))
 }
 
-// ParticipantStats represents aggregated stats for the dashboard
 type ParticipantStats struct {
 	ParticipantID     uint   `json:"participant_id"`
 	Nickname          string `json:"nickname"`
 	TotalWins         int    `json:"total_wins"`
 	TotalPoints       int    `json:"total_points"`
+	TotalLeaguePoints int    `json:"total_league_points"` // The new custom points
 	TotalSpin         int    `json:"total_spin"`
 	TotalBurst        int    `json:"total_burst"`
 	TotalOver         int    `json:"total_over"`
@@ -80,11 +80,11 @@ func GetLeagueStats(w http.ResponseWriter, r *http.Request) {
 	var results []ParticipantStats
 
 	err := db.DB.Model(&models.TournamentParticipant{}).
-		Select("participant_id, participants.nickname, sum(wins) as total_wins, sum(points) as total_points, sum(spin_finishes) as total_spin, sum(burst_finishes) as total_burst, sum(over_finishes) as total_over, sum(xtreme_finishes) as total_xtreme, count(tournament_id) as tournaments_played").
+		Select("participant_id, participants.nickname, sum(wins) as total_wins, sum(points) as total_points, sum(league_points) as total_league_points, sum(spin_finishes) as total_spin, sum(burst_finishes) as total_burst, sum(over_finishes) as total_over, sum(xtreme_finishes) as total_xtreme, count(tournament_id) as tournaments_played").
 		Joins("join participants on participants.id = tournament_participants.participant_id").
 		Where("participants.is_archived = ?", false).
 		Group("participant_id, participants.nickname").
-		Order("total_points DESC, total_wins DESC").
+		Order("total_league_points DESC, total_wins DESC").
 		Scan(&results).Error
 
 	if err != nil {

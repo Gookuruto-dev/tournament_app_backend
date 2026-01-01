@@ -210,6 +210,17 @@ func GenerateMatches(w http.ResponseWriter, r *http.Request) {
 		if err := tx.Create(&matches).Error; err != nil {
 			return err
 		}
+		// Award Participation Points (5)
+		var participants []models.TournamentParticipant
+		if err := tx.Where("tournament_id = ?", tourID).Find(&participants).Error; err != nil {
+			return err
+		}
+		for i := range participants {
+			participants[i].AwardParticipation()
+			if err := tx.Save(&participants[i]).Error; err != nil {
+				return err
+			}
+		}
 		t.Status = "InProgress"
 		return tx.Save(&t).Error
 	})
@@ -299,6 +310,17 @@ func AdvanceTournamentPhase(w http.ResponseWriter, r *http.Request) {
 				if err := generateBracketMatches(tx, t.ID, qualifiedIDs, 1); err != nil {
 					return err
 				}
+				// Award Qualification Points (8)
+				var participants []models.TournamentParticipant
+				if err := tx.Where("tournament_id = ? AND participant_id IN ?", t.ID, qualifiedIDs).Find(&participants).Error; err != nil {
+					return err
+				}
+				for i := range participants {
+					participants[i].AwardQualification()
+					if err := tx.Save(&participants[i]).Error; err != nil {
+						return err
+					}
+				}
 				t.Status = "BracketInProgress"
 				return tx.Save(&t).Error
 			}); err != nil {
@@ -328,6 +350,61 @@ func AdvanceTournamentPhase(w http.ResponseWriter, r *http.Request) {
 
 		if allFinalsFinished {
 			t.Status = "Finished"
+			// Award Podium Points
+			finalMatch := models.Match{}
+			for _, m := range t.Matches {
+				if m.Phase == "Bracket" && m.Round == maxRound {
+					finalMatch = m
+					break
+				}
+			}
+
+			if finalMatch.WinnerID != nil {
+				// 1st Place
+				var winnerTP models.TournamentParticipant
+				if err := db.DB.Where("tournament_id = ? AND participant_id = ?", t.ID, *finalMatch.WinnerID).First(&winnerTP).Error; err == nil {
+					winnerTP.AwardPodium(1)
+					db.DB.Save(&winnerTP)
+				}
+
+				// 2nd Place
+				runnerUpID := finalMatch.Player1ID
+				if *finalMatch.WinnerID == *finalMatch.Player1ID {
+					runnerUpID = finalMatch.Player2ID
+				}
+				if runnerUpID != nil {
+					var runnerUpTP models.TournamentParticipant
+					if err := db.DB.Where("tournament_id = ? AND participant_id = ?", t.ID, *runnerUpID).First(&runnerUpTP).Error; err == nil {
+						runnerUpTP.AwardPodium(2)
+						db.DB.Save(&runnerUpTP)
+					}
+				}
+
+				// 3rd Place (Best SF loser)
+				if maxRound > 1 {
+					var sfLosers []uint
+					for _, m := range t.Matches {
+						if m.Phase == "Bracket" && m.Round == maxRound-1 {
+							loserID := m.Player1ID
+							if m.WinnerID != nil && *m.WinnerID == *m.Player1ID {
+								loserID = m.Player2ID
+							}
+							if loserID != nil {
+								sfLosers = append(sfLosers, *loserID)
+							}
+						}
+					}
+					if len(sfLosers) > 0 {
+						var bestTP models.TournamentParticipant
+						if err := db.DB.Where("tournament_id = ? AND participant_id IN ?", t.ID, sfLosers).
+							Order("wins DESC, points DESC").First(&bestTP).Error; err == nil {
+							bestTP.AwardPodium(3)
+							db.DB.Save(&bestTP)
+						}
+					}
+				}
+			}
+
 			db.DB.Save(&t)
 		} else {
 			http.Error(w, "Final match is not finished yet", http.StatusBadRequest)
