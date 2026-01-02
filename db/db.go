@@ -24,7 +24,7 @@ func InitDB() {
 	} else {
 		// 🧪 SQLite fallback (Local / Dev)
 		log.Println("DATABASE_URL not found, using SQLite")
-		DB, err = gorm.Open(sqlite.Open("local.db"), &gorm.Config{})
+		DB, err = gorm.Open(sqlite.Open("tournament.db"), &gorm.Config{})
 	}
 
 	if err != nil {

@@ -12,7 +12,7 @@ import (
 )
 
 func main() {
-	db.InitDB("tournament.db")
+	db.InitDB()
 
 	r := chi.NewRouter()
 	r.Use(middleware.Logger)
