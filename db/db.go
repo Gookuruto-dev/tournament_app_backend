@@ -3,21 +3,35 @@ package db
 import (
 	"bbx_tournament/models"
 	"log"
+	"os"
 
 	"github.com/glebarez/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 )
 
 var DB *gorm.DB
 
-func InitDB(dataSourceName string) {
+func InitDB() {
 	var err error
-	DB, err = gorm.Open(sqlite.Open(dataSourceName), &gorm.Config{})
+
+	dsn := os.Getenv("DATABASE_URL")
+
+	if dsn != "" {
+		// ✅ PostgreSQL (Render / Production)
+		log.Println("Using PostgreSQL database")
+		DB, err = gorm.Open(postgres.Open(dsn), &gorm.Config{})
+	} else {
+		// 🧪 SQLite fallback (Local / Dev)
+		log.Println("DATABASE_URL not found, using SQLite")
+		DB, err = gorm.Open(sqlite.Open("local.db"), &gorm.Config{})
+	}
+
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
 	}
 
-	// Auto Migrate the schema
+	// Auto migrate
 	err = DB.AutoMigrate(
 		&models.Participant{},
 		&models.Deck{},
@@ -30,5 +44,5 @@ func InitDB(dataSourceName string) {
 		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
-	log.Println("Database connection established and migrated successfully.")
+	log.Println("Database initialized successfully.")
 }

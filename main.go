@@ -36,6 +36,7 @@ func main() {
 	r.Get("/tournaments", handlers.GetTournaments)
 	r.Post("/tournaments", handlers.CreateTournament)
 	r.Post("/tournaments/{id}/archive", handlers.ArchiveTournament)
+	r.Post("/tournaments/{id}/unarchive", handlers.UnarchiveTournament)
 	r.Get("/tournaments/{id}", handlers.GetTournamentDetails)
 	r.Post("/tournaments/{id}/participants", handlers.AddParticipantToTournament)
 	r.Delete("/tournaments/{id}/participants/{participantId}", handlers.RemoveParticipantFromTournament)

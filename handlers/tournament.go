@@ -486,3 +486,20 @@ func ArchiveTournament(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(`{"status": "archived"}`))
 }
+
+// UnarchiveTournament unsoft-deletes a tournament
+func UnarchiveTournament(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	if idStr == "" {
+		http.Error(w, "Missing ID", http.StatusBadRequest)
+		return
+	}
+
+	if err := db.DB.Model(&models.Tournament{}).Where("id = ?", idStr).Update("is_archived", false).Error; err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(`{"status": "restored"}`))
+}
